@@ -1,0 +1,77 @@
+﻿<Window x:Class="Synced_Player.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Synced_Player"
+        mc:Ignorable="d"
+        Background = "Transparent"
+        MouseMove="Window_MouseMove"
+        Closing="MainWindow_Closing"
+        Title="Sync Player" Height="640" Width="1000">
+    <Window.InputBindings>
+        <KeyBinding Modifiers="Ctrl" Key="O" Command="{Binding OpenFileCommand}"/>
+        <KeyBinding Key="Space" Command="{Binding PauseResumeCommand}" />
+        <KeyBinding Key="S" Command="{Binding StopCommand}" />
+        <KeyBinding Key="F" Command="{Binding ToggleFullscreenCommand}"/>
+        <KeyBinding Key="Esc" Command="{Binding EscapeFullscreenCommand}"/>
+        <KeyBinding Modifiers="Shift" Key="Left" Command="{Binding SeekBackwardXSeconds}" CommandParameter="5"/>
+        <KeyBinding Modifiers="Shift" Key="Right" Command="{Binding SeekForwardXSeconds}" CommandParameter="5"/>
+        <KeyBinding Modifiers="Alt" Key="Left" Command="{Binding SeekBackwardXSeconds}" CommandParameter="10"/>
+        <KeyBinding Modifiers="Alt" Key="Right" Command="{Binding SeekForwardXSeconds}" CommandParameter="10"/>
+        <KeyBinding Modifiers="Ctrl" Key="Left" Command="{Binding SeekBackwardXSeconds}" CommandParameter="60"/>
+        <KeyBinding Modifiers="Ctrl" Key="Right" Command="{Binding SeekForwardXSeconds}" CommandParameter="60"/>
+    </Window.InputBindings>
+    <Grid>
+        <wpf:VlcPlayer xmlns:wpf="clr-namespace:Meta.Vlc.Wpf;assembly=Meta.Vlc.Wpf"
+                       x:Name="vlcPlayer"
+                       Loaded="VlcPlayer_Loaded"
+                       MouseDoubleClick="VlcPlayer_MouseDoubleClick"
+                       PositionChanged="VlcPlayer_PositionChanged"
+                       Mouse.MouseWheel="VlcPlayer_MouseWheel"/>
+        <StackPanel x:Name="controlBar"
+                    Grid.ZIndex="0"
+                    VerticalAlignment="Bottom"
+                    Background="#F0F0F0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="elapsedTime" Grid.Column="0" Margin="10 0 15 0">--:--</TextBlock>
+                <Slider x:Name="seekBar"
+                    Minimum="0"
+                    Maximum="1"
+                    IsMoveToPointEnabled="True"
+                    ValueChanged="SeekBar_ValueChanged"
+                    IsEnabled="False"
+                    Focusable="False"
+                    Grid.Column="1"/>
+                <TextBlock x:Name="totalOrRemainingTime" Grid.Column="2" Margin="15 0 10 0">--:--</TextBlock>
+            </Grid>
+            <StackPanel
+                Orientation="Horizontal"
+                HorizontalAlignment="Center"
+                Margin="0 0 0 10">
+                <StackPanel.Resources>
+                    <Style TargetType="Button">
+                        <Setter Property="Margin" Value="10 0 0 0" />
+                        <Setter Property="Padding" Value="5" />
+                    </Style>
+                </StackPanel.Resources>
+                <Button Click="OpenFileButton_Click" Focusable="False">Open File</Button>
+                <Button Click="PlayButton_Click" Focusable="False">Play</Button>
+                <Button Click="PauseButton_Click" Focusable="False">Pause</Button>
+                <Button Click="StopButton_Click" Focusable="False">Stop</Button>
+                <Slider x:Name="volume"
+                        Minimum="0"
+                        Maximum="100"
+                        IsMoveToPointEnabled="True"
+                        Width="100"
+                        ValueChanged="Volume_ValueChanged"
+                        Focusable="False"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>
