@@ -1,9 +1,15 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Media;
 using System.Timers;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Shell;
 
 namespace Synced_Player
 {
@@ -17,33 +23,45 @@ namespace Synced_Player
         public DelegateCommand StopCommand { get; set; }
         public DelegateCommand ToggleFullscreenCommand { get; set; }
         public DelegateCommand EscapeFullscreenCommand { get; set; }
-        public DelegateCommand SeekForwardXSeconds { get; set; }
-        public DelegateCommand SeekBackwardXSeconds { get; set; }
+        public DelegateCommand SeekForwardXSecondsCommand { get; set; }
+        public DelegateCommand SeekBackwardXSecondsCommand { get; set; }
+        public DelegateCommand OpenPreferencesCommand { get; set; }
+        public DelegateCommand OpenChatCommand { get; set; }
+        public ObservableCollection<String> Messages { get; set; }
 
         private Timer hideTimer;
-        private bool vlcPlayerStopped = false;
+        private bool vlcPlayerPausedOrStopped = false;
+        private SyncClient syncClient;
+        private SoundPlayer messageAlert;
+        private WindowState windowStateBeforeFullScreen;
 
         public MainWindow()
         {
             InitializeComponent();
 
+            Left = Properties.Settings.Default.MainWindowLeft;
+            Top = Properties.Settings.Default.MainWindowTop;
+            Width = Properties.Settings.Default.MainWindowWidth;
+            Height = Properties.Settings.Default.MainWindowHeight;
+            WindowState = Properties.Settings.Default.MainWindowWindowState;
+
             volume.Value = vlcPlayer.Volume;
 
-            hideTimer = new Timer(2000)
+            hideTimer = new Timer(1000)
             {
                 AutoReset = false
             };
 
             hideTimer.Elapsed += delegate // Hide cursor & control bar
             {
-                //if (Application.Current.MainWindow.WindowStyle == WindowStyle.None)
-                //{
-                Application.Current.Dispatcher.Invoke(new Action(() =>
+                Dispatcher.Invoke(new Action(() =>
                 {
-                    Mouse.OverrideCursor = Cursors.None;
-                    controlBar.Visibility = Visibility.Collapsed;
+                    if (WindowStyle == WindowStyle.None)
+                    {
+                        Mouse.OverrideCursor = Cursors.None;
+                        controlBar.Visibility = Visibility.Collapsed;
+                    }
                 }));
-                //}
             };
 
             OpenFileCommand = new DelegateCommand(ExecuteOpenFileCommand, (x) => true);
@@ -51,11 +69,170 @@ namespace Synced_Player
             StopCommand = new DelegateCommand(ExecuteStopCommand, (x) => true);
             ToggleFullscreenCommand = new DelegateCommand(ExecuteToggleFullscreenCommand, (x) => true);
             EscapeFullscreenCommand = new DelegateCommand(ExecuteEscapeFullscreenCommand, (x) => true);
-            SeekBackwardXSeconds = new DelegateCommand(ExecuteSeekBackwardXSeconds, (x) => true);
-            SeekForwardXSeconds = new DelegateCommand(ExecuteSeekForwardXSeconds, (x) => true);
+            SeekBackwardXSecondsCommand = new DelegateCommand(ExecuteSeekBackwardXSecondsCommand, (x) => true);
+            SeekForwardXSecondsCommand = new DelegateCommand(ExecuteSeekForwardXSecondsCommand, (x) => true);
+            OpenPreferencesCommand = new DelegateCommand(ExecuteOpenPreferencesCommand, (x) => true);
+            OpenChatCommand = new DelegateCommand(ExecuteOpenChatCommand, (x) => true);
+
+            Messages = new ObservableCollection<string>();
 
             DataContext = this;
+
+            messageAlert = new SoundPlayer(@"Sounds\Received.wav");
+
+            JoinRoom();
         }
+
+        // Event Handlers
+
+        // MainWindow Event Handlers
+
+        private void MainWindow_LocationChanged(object sender, EventArgs e)
+        {
+            CenterAllOwnedWindowsToSelf();
+        }
+
+        private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            CenterAllOwnedWindowsToSelf();
+        }
+
+        private void MainWindow_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (WindowStyle == WindowStyle.None)
+            {
+                UndoHideCursor();
+            }
+        }
+
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            syncClient?.Close();
+
+            vlcPlayer.Stop();
+            vlcPlayer.Dispose();
+
+            Properties.Settings.Default.Save();
+        }
+
+        // SyncClient Event Handlers
+
+        private void SyncClient_SeekToReceived(object sender, SyncEventArgs e)
+        {
+            float seekTime = float.Parse(e.SeekTime);
+            vlcPlayer.Position = seekTime;
+            SeekUpdate();
+            ShowNotification(e.User + " seeked the video to " + StringifyElapsedTime(seekTime));
+        }
+
+        private void SyncClient_PauseReceived(object sender, SyncEventArgs e)
+        {
+            float seekTime = float.Parse(e.SeekTime);
+            vlcPlayer.Pause();
+            vlcPlayer.Position = seekTime;
+            SeekUpdate();
+            ShowNotification(e.User + " paused the video at " + StringifyElapsedTime(seekTime));
+        }
+
+        private void SyncClient_PlayReceived(object sender, SyncEventArgs e)
+        {
+            float seekTime = float.Parse(e.SeekTime);
+            vlcPlayer.Position = seekTime;
+            SeekUpdate();
+            vlcPlayer.Play();
+            ShowNotification(e.User + " played the video from " + StringifyElapsedTime(seekTime));
+        }
+
+        private void SyncClient_ChatReceived(object sender, ChatEventArgs e)
+        {
+            float seekTime = float.Parse(e.SeekTime);
+            Dispatcher.Invoke(() =>
+            {
+                Messages.Add(e.User + " [" + StringifyElapsedTime(seekTime) + "]: " + e.ChatMessage);
+                messageAlert.Play();
+            });
+        }
+
+        // VlcPlayer Event Handlers
+
+        private void VlcPlayer_Loaded(object sender, RoutedEventArgs e)
+        {
+            // this event is called when vlcplayer has finished initialization - not when the media is loaded
+        }
+
+        private void VlcPlayer_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            ToggleFullScreen();
+        }
+
+        // will not be called when you set vlcPlayer.Position :| - it's only called when the media is playing
+        // that means we'll have to call SeekUpdate() manually whenever we change vlcPlayer.Position
+        private void VlcPlayer_PositionChanged(object sender, EventArgs e)
+        {
+            SeekUpdate();
+        }
+
+        private void VlcPlayer_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (e.Delta > -1) // scroll up
+            {
+                if (volume.Value <= 95)
+                {
+                    volume.Value = volume.Value + 5;
+                }
+                else
+                {
+                    volume.Value = 100;
+                }
+            }
+            else // scroll down
+            {
+                if (volume.Value >= 5)
+                {
+                    volume.Value = volume.Value - 5;
+                }
+                else
+                {
+                    volume.Value = 0;
+                }
+            }
+        }
+
+        // ControlBar Event Handlers
+
+        private void OpenFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFile();
+        }
+
+        private void PlayButton_Click(object sender, RoutedEventArgs e)
+        {
+            Play();
+        }
+
+        private void PauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            Pause();
+        }
+
+        private void StopButton_Click(object sender, RoutedEventArgs e)
+        {
+            StopPlayback();
+        }
+
+        private void Volume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            vlcPlayer.Volume = (int)volume.Value;
+        }
+
+        private void SeekBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            //syncClient?.SendSeekTo(vlcPlayer.Position.ToString());
+            vlcPlayer.Position = (float)seekBar.Value;
+            UpdatePlayerTimes();
+        }
+
+        // Commands
 
         private void ExecuteOpenFileCommand(object parameter)
         {
@@ -64,13 +241,13 @@ namespace Synced_Player
 
         private void ExecutePauseResumeCommand(object parameter)
         {
-            if (!vlcPlayerStopped) {
-                vlcPlayer.PauseOrResume();
+            if (!vlcPlayerPausedOrStopped)
+            {
+                Pause();
             }
             else
             {
-                vlcPlayer.Play();
-                vlcPlayerStopped = false;
+                Play();
             }
         }
 
@@ -88,42 +265,86 @@ namespace Synced_Player
         {
             if (WindowStyle == WindowStyle.None)
             {
-                WindowStyle = WindowStyle.SingleBorderWindow;
-                WindowState = WindowState.Normal;
-                ResizeMode = ResizeMode.CanResize;
+                ExitFullScreen();
             }
         }
 
-        private void ExecuteSeekBackwardXSeconds(object seconds)
+        private void ExecuteSeekBackwardXSecondsCommand(object seconds)
         {
             var currentPosition = vlcPlayer.Position * vlcPlayer.Length.TotalSeconds;
             var backXSecondsFromcurrentPosition = currentPosition - Int32.Parse((string)seconds);
+            syncClient?.SendSeekTo(vlcPlayer.Position.ToString());
             vlcPlayer.Position = (float)(backXSecondsFromcurrentPosition / vlcPlayer.Length.TotalSeconds);
             SeekUpdate();
         }
 
-        private void ExecuteSeekForwardXSeconds(object seconds)
+        private void ExecuteSeekForwardXSecondsCommand(object seconds)
         {
             var currentPosition = vlcPlayer.Position * vlcPlayer.Length.TotalSeconds;
             var forwardXSecondsFromcurrentPosition = currentPosition + Int32.Parse((string)seconds);
+            syncClient?.SendSeekTo(vlcPlayer.Position.ToString());
             vlcPlayer.Position = (float)(forwardXSecondsFromcurrentPosition / vlcPlayer.Length.TotalSeconds);
             SeekUpdate();
         }
 
-        private void Volume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        private void ExecuteOpenPreferencesCommand(object parameter)
         {
-            vlcPlayer.Volume = (int)volume.Value;
+            Window preferences = new PreferencesWindow();
+            preferences.Owner = this;
+            preferences.Show();
         }
 
-        private void SeekBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        private void ExecuteOpenChatCommand(object parameter)
         {
-            vlcPlayer.Position = (float)seekBar.Value;
-            UpdatePlayerTimes();
+            ChatModal chatModal = new ChatModal();
+            chatModal.Owner = this;
+            chatModal.DataContext = this;
+            chatModal.Show();
         }
 
-        private void VlcPlayer_Loaded(object sender, RoutedEventArgs e)
+        // Plain Methods
+
+        public bool JoinRoom()
         {
-            // this event is called when vlcplayer has finished initialization not when the media is loaded
+            if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.ServerAddress) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.RoomName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.Username) && syncClient == null)
+            {
+                syncClient = SyncClient.CreateInstance(Properties.Settings.Default.ServerAddress, Properties.Settings.Default.RoomName, Properties.Settings.Default.Username);
+                if (syncClient != null)
+                {
+                    syncClient.SeekToReceived += SyncClient_SeekToReceived;
+                    syncClient.PauseReceived += SyncClient_PauseReceived;
+                    syncClient.PlayReceived += SyncClient_PlayReceived;
+                    syncClient.ChatReceived += SyncClient_ChatReceived;
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public void LeaveRoom()
+        {
+            syncClient?.Close();
+        }
+
+        public void SendChat(String message)
+        {
+            syncClient?.SendChatMessage(vlcPlayer.Position.ToString(), message);
+        }
+
+        private void CenterAllOwnedWindowsToSelf()
+        {
+            foreach (Window win in OwnedWindows)
+            {
+                win.Left = Left + (Width - win.ActualWidth) / 2;
+                win.Top = Top + (Height - win.ActualHeight) / 2;
+            }
         }
 
         private void ToggleFullScreen()
@@ -131,54 +352,85 @@ namespace Synced_Player
             // out of fullscreen
             if (WindowStyle == WindowStyle.None)
             {
-                WindowStyle = WindowStyle.SingleBorderWindow;
-                WindowState = WindowState.Normal;
-                ResizeMode = ResizeMode.CanResize;
+                ExitFullScreen();
             }
             else // into fullscreen
             {
-                WindowState = WindowState.Normal;
-                WindowStyle = WindowStyle.None;
-                WindowState = WindowState.Maximized;
-                ResizeMode = ResizeMode.NoResize;
+                EnterFullScreen();
             }
-        }
-
-        private void VlcPlayer_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            ToggleFullScreen();
-        }
-
-        private void VlcPlayer_PositionChanged(object sender, EventArgs e) // will not be called when you set the position :| - it's only called when the media is playing
-        {
-            SeekUpdate();
-        }
-
-        private void SeekUpdate()
-        {
-            seekBar.Value = vlcPlayer.Position;
-            UpdatePlayerTimes();
         }
 
         private void UpdatePlayerTimes()
         {
-            var elapsedTimeSpan = TimeSpan.FromSeconds(vlcPlayer.Position * vlcPlayer.Length.TotalSeconds);
-            var totalOrRemainingTimeSpan = TimeSpan.FromSeconds(vlcPlayer.Length.TotalSeconds);
-            if (totalOrRemainingTimeSpan.Hours > 0)
+            elapsedTime.Text = StringifyElapsedTime();
+            totalOrRemainingTime.Text = StringifyTotalDuration();
+        }
+
+        private TimeSpan GetElapsedTime()
+        {
+            return TimeSpan.FromSeconds(vlcPlayer.Position * vlcPlayer.Length.TotalSeconds);
+        }
+
+        /// <param name="elapsedSeekTimeBetween0to1">This will usually be vlcPlayer.Position from another player</param>
+        private TimeSpan GetElapsedTime(double elapsedSeekTimeBetween0to1)
+        {
+            return TimeSpan.FromSeconds(elapsedSeekTimeBetween0to1 * vlcPlayer.Length.TotalSeconds);
+        }
+
+        private TimeSpan GetTotalDuration()
+        {
+            return TimeSpan.FromSeconds(vlcPlayer.Length.TotalSeconds);
+        }
+
+        public String StringifyElapsedTime()
+        {
+            TimeSpan elapsedTime = GetElapsedTime();
+            TimeSpan totalDuration = GetTotalDuration();
+            if (totalDuration.Hours > 0)
             {
-                elapsedTime.Text = elapsedTimeSpan.ToString(@"hh\:mm\:ss");
-                totalOrRemainingTime.Text = totalOrRemainingTimeSpan.ToString(@"hh\:mm\:ss");
+                return elapsedTime.ToString(@"hh\:mm\:ss");
             }
             else
             {
-                elapsedTime.Text = elapsedTimeSpan.ToString(@"mm\:ss");
-                totalOrRemainingTime.Text = totalOrRemainingTimeSpan.ToString(@"mm\:ss");
+                return elapsedTime.ToString(@"mm\:ss");
             }
         }
 
-        private void OpenFileButton_Click(object sender, RoutedEventArgs e)
+        /// <param name="elapsedSeekTimeBetween0to1">This will usually be vlcPlayer.Position from another player</param>
+        public String StringifyElapsedTime(double elapsedSeekTimeBetween0to1)
         {
-            OpenFile();
+            TimeSpan elapsedTime = GetElapsedTime(elapsedSeekTimeBetween0to1);
+            TimeSpan totalDuration = GetTotalDuration();
+            if (totalDuration.Hours > 0)
+            {
+                return elapsedTime.ToString(@"hh\:mm\:ss");
+            }
+            else
+            {
+                return elapsedTime.ToString(@"mm\:ss");
+            }
+        }
+
+        private String StringifyTotalDuration()
+        {
+            TimeSpan totalDuration = GetTotalDuration();
+            if (totalDuration.Hours > 0)
+            {
+                return totalDuration.ToString(@"hh\:mm\:ss");
+            }
+            else
+            {
+                return totalDuration.ToString(@"mm\:ss");
+            }
+        }
+
+        private void SeekUpdate()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                seekBar.Value = vlcPlayer.Position;
+                UpdatePlayerTimes();
+            });
         }
 
         private void OpenFile()
@@ -191,36 +443,33 @@ namespace Synced_Player
                 vlcPlayer.LoadMedia(openFileDialog.FileName);
                 Title = Path.GetFileName(openFileDialog.FileName) + " - " + Title;
                 seekBar.IsEnabled = true;
-                vlcPlayer.Play();
+                Play();
             }
         }
 
-        private void PlayButton_Click(object sender, RoutedEventArgs e)
+        private void Play()
         {
+            syncClient?.SendPlay(vlcPlayer.Position.ToString());
             vlcPlayer.Play();
+            vlcPlayerPausedOrStopped = false;
         }
 
-        private void PauseButton_Click(object sender, RoutedEventArgs e)
+        private void Pause()
         {
+            syncClient?.SendPause(vlcPlayer.Position.ToString());
             vlcPlayer.Pause();
+            vlcPlayerPausedOrStopped = true;
         }
 
         private void StopPlayback()
         {
-            if (!vlcPlayerStopped)
-            {
-                vlcPlayer.Stop();
-                seekBar.Value = 0;
-                vlcPlayerStopped = true;
-            }
+            syncClient?.SendPause("0");
+            vlcPlayer.Stop();
+            seekBar.Value = 0;
+            vlcPlayerPausedOrStopped = true;
         }
 
-        private void StopButton_Click(object sender, RoutedEventArgs e)
-        {
-            StopPlayback();
-        }
-
-        private void Window_MouseMove(object sender, MouseEventArgs e)
+        private void UndoHideCursor()
         {
             hideTimer.Stop();
             Mouse.OverrideCursor = null; // Show cursor
@@ -228,28 +477,46 @@ namespace Synced_Player
             hideTimer.Start();
         }
 
-        private void VlcPlayer_MouseWheel(object sender, MouseWheelEventArgs e)
+        private void EnterFullScreen()
         {
-            if (e.Delta > -1) // scroll up
-            {
-                if (volume.Value < 100)
-                {
-                    volume.Value = volume.Value + 5;
-                }
-            }
-            else // scroll down
-            {
-                if (volume.Value > 0)
-                {
-                    volume.Value = volume.Value - 5;
-                }
-            }
+            Grid.SetRow(controlBar, 0);
+            windowStateBeforeFullScreen = WindowState;
+            WindowState = WindowState.Normal;
+            WindowStyle = WindowStyle.None;
+            WindowState = WindowState.Maximized;
+            ResizeMode = ResizeMode.NoResize;
         }
 
-        private void MainWindow_Closing(object sender, EventArgs e)
+        private void ExitFullScreen()
         {
-            vlcPlayer.Stop();
-            vlcPlayer.Dispose();
+            UndoHideCursor();
+            Grid.SetRow(controlBar, 1);
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            WindowState = windowStateBeforeFullScreen;
+            ResizeMode = ResizeMode.CanResize;
+        }
+
+        private void ShowNotification(String notification)
+        {
+            Timer timer = new Timer(3000);
+            Dispatcher.Invoke(() =>
+            {
+                notificationBlock.Text = notification;
+                notificationBlock.Visibility = Visibility.Visible;
+            });
+            timer.Start();
+            timer.Elapsed += delegate
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    // this ensures that the notificationBlock isn't hidden if a new notification has arrived within the elapsed time
+                    if (notificationBlock.Text == notification)
+                    {
+                        notificationBlock.Visibility = Visibility.Hidden;
+                    }
+                });
+                timer.Stop();
+            };
         }
     }
 }

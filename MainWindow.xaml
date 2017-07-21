@@ -5,34 +5,58 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Synced_Player"
         mc:Ignorable="d"
-        Background = "Transparent"
-        MouseMove="Window_MouseMove"
+        x:Name="MyMainWindow"
+        xmlns:properties="clr-namespace:Synced_Player.Properties"
+        Background="Transparent"
+        LocationChanged="MainWindow_LocationChanged"
+        SizeChanged="MainWindow_SizeChanged"
+        MouseMove="MainWindow_MouseMove"
         Closing="MainWindow_Closing"
-        Title="Sync Player" Height="640" Width="1000">
+        Left="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowLeft, Mode=TwoWay}"
+        Top="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowTop, Mode=TwoWay}"
+        Width="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowWidth, Mode=TwoWay}"
+        Height="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowHeight, Mode=TwoWay}"
+        WindowState="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowWindowState, Mode=TwoWay}"
+        Title="Sync Player">
     <Window.InputBindings>
-        <KeyBinding Modifiers="Ctrl" Key="O" Command="{Binding OpenFileCommand}"/>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}"/>
         <KeyBinding Key="Space" Command="{Binding PauseResumeCommand}" />
         <KeyBinding Key="S" Command="{Binding StopCommand}" />
         <KeyBinding Key="F" Command="{Binding ToggleFullscreenCommand}"/>
         <KeyBinding Key="Esc" Command="{Binding EscapeFullscreenCommand}"/>
-        <KeyBinding Modifiers="Shift" Key="Left" Command="{Binding SeekBackwardXSeconds}" CommandParameter="5"/>
-        <KeyBinding Modifiers="Shift" Key="Right" Command="{Binding SeekForwardXSeconds}" CommandParameter="5"/>
-        <KeyBinding Modifiers="Alt" Key="Left" Command="{Binding SeekBackwardXSeconds}" CommandParameter="10"/>
-        <KeyBinding Modifiers="Alt" Key="Right" Command="{Binding SeekForwardXSeconds}" CommandParameter="10"/>
-        <KeyBinding Modifiers="Ctrl" Key="Left" Command="{Binding SeekBackwardXSeconds}" CommandParameter="60"/>
-        <KeyBinding Modifiers="Ctrl" Key="Right" Command="{Binding SeekForwardXSeconds}" CommandParameter="60"/>
+        <KeyBinding Gesture="Shift+Left" Command="{Binding SeekBackwardXSecondsCommand}" CommandParameter="5"/>
+        <KeyBinding Gesture="Shift+Right" Command="{Binding SeekForwardXSecondsCommand}" CommandParameter="5"/>
+        <KeyBinding Gesture="Alt+Left" Command="{Binding SeekBackwardXSecondsCommand}" CommandParameter="10"/>
+        <KeyBinding Gesture="Alt+Right" Command="{Binding SeekForwardXSecondsCommand}" CommandParameter="10"/>
+        <KeyBinding Gesture="Ctrl+Left" Command="{Binding SeekBackwardXSecondsCommand}" CommandParameter="60"/>
+        <KeyBinding Gesture="Ctrl+Right" Command="{Binding SeekForwardXSecondsCommand}" CommandParameter="60"/>
+        <KeyBinding Gesture="Ctrl+P" Command="{Binding OpenPreferencesCommand}"/>
+        <KeyBinding Key="C" Command="{Binding OpenChatCommand}"/>
+        <KeyBinding Key="Return" Command="{Binding OpenChatCommand}"/>
     </Window.InputBindings>
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="notificationBlock"
+                       Foreground="White"
+                       FontSize="40"
+                       Padding="35"
+                       VerticalAlignment="Top"
+                       HorizontalAlignment="Right"
+                       Panel.ZIndex="1" />
         <wpf:VlcPlayer xmlns:wpf="clr-namespace:Meta.Vlc.Wpf;assembly=Meta.Vlc.Wpf"
                        x:Name="vlcPlayer"
                        Loaded="VlcPlayer_Loaded"
                        MouseDoubleClick="VlcPlayer_MouseDoubleClick"
                        PositionChanged="VlcPlayer_PositionChanged"
-                       Mouse.MouseWheel="VlcPlayer_MouseWheel"/>
+                       Mouse.MouseWheel="VlcPlayer_MouseWheel"
+                       Grid.Row="0"/>
         <StackPanel x:Name="controlBar"
-                    Grid.ZIndex="0"
                     VerticalAlignment="Bottom"
-                    Background="#F0F0F0">
+                    Background="#F0F0F0"
+                    Grid.Row="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -70,6 +94,7 @@
                         IsMoveToPointEnabled="True"
                         Width="100"
                         ValueChanged="Volume_ValueChanged"
+                        Value="{Binding Source={x:Static properties:Settings.Default}, Path=Volume, Mode=TwoWay}"
                         Focusable="False"/>
             </StackPanel>
         </StackPanel>
