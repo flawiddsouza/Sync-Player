@@ -36,6 +36,7 @@ namespace Synced_Player
                     else
                     {
                         Close();
+                        ((MainWindow)Owner).ChatOpen = false;
                         e.Handled = true;
                     }
                     break;
@@ -64,6 +65,7 @@ namespace Synced_Player
             if (e.Key == Key.Escape)
             {
                 Close();
+                ((MainWindow)Owner).ChatOpen = false;
                 e.Handled = true;
             }
         }

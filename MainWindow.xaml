@@ -5,12 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Synced_Player"
         mc:Ignorable="d"
-        x:Name="MyMainWindow"
         xmlns:properties="clr-namespace:Synced_Player.Properties"
         Background="Transparent"
         LocationChanged="MainWindow_LocationChanged"
         SizeChanged="MainWindow_SizeChanged"
         MouseMove="MainWindow_MouseMove"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
+        PreviewKeyUp="MainWindow_PreviewKeyUp"
         Closing="MainWindow_Closing"
         Left="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowLeft, Mode=TwoWay}"
         Top="{Binding Source={x:Static properties:Settings.Default}, Path=MainWindowTop, Mode=TwoWay}"
@@ -46,6 +47,27 @@
                        VerticalAlignment="Top"
                        HorizontalAlignment="Right"
                        Panel.ZIndex="1" />
+        <Grid x:Name="infoPanel"
+              Panel.ZIndex="2"
+              Width="500"
+              Height="400"
+              Background="DarkSlateBlue"
+              Visibility="Hidden">
+            <!--<Grid.Background>
+                <SolidColorBrush Opacity="1" Color="DarkSlateBlue"/>
+            </Grid.Background>-->
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Center">
+                <StackPanel.Resources>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="FontSize" Value="30" />
+                    </Style>
+                </StackPanel.Resources>
+                <TextBlock Margin="0 0 10 0" Foreground="White">Status:</TextBlock>
+                <TextBlock x:Name="connectionStatus"/>
+            </StackPanel>
+        </Grid>
         <wpf:VlcPlayer xmlns:wpf="clr-namespace:Meta.Vlc.Wpf;assembly=Meta.Vlc.Wpf"
                        x:Name="vlcPlayer"
                        Loaded="VlcPlayer_Loaded"

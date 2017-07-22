@@ -10,6 +10,7 @@
         ResizeMode="NoResize"
         PreviewKeyDown="PreferencesWindow_PreviewKeyDown"
         Loaded="ChatModal_Loaded"
+        ShowInTaskbar="False"
         Width="500" Height="500">
     <Grid>
         <Grid.RowDefinitions>

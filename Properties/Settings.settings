@@ -29,5 +29,11 @@
     <Setting Name="Volume" Provider="crdx.Settings.PortableSettingsProvider" Roaming="true" Type="System.Double" Scope="User">
       <Value Profile="(Default)">100</Value>
     </Setting>
+    <Setting Name="PauseAndOpenChatOnMessageReceived" Provider="crdx.Settings.PortableSettingsProvider" Roaming="true" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="DontPlayOnMediaLoad" Provider="crdx.Settings.PortableSettingsProvider" Roaming="true" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

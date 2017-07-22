@@ -6,8 +6,9 @@
         xmlns:local="clr-namespace:Synced_Player"
         mc:Ignorable="d"
         WindowStartupLocation="CenterOwner"
-        Title="Preferences" Width="300" SizeToContent="Height"
-        PreviewKeyDown="PreferencesWindow_PreviewKeyDown">
+        Title="Preferences" SizeToContent="WidthAndHeight"
+        PreviewKeyDown="PreferencesWindow_PreviewKeyDown"
+        ShowInTaskbar="False">
     <Grid>
         <StackPanel Margin="20">
             <StackPanel.Resources>
@@ -25,7 +26,18 @@
             <TextBox x:Name="roomName" />
             <Label>Username</Label>
             <TextBox x:Name="username" />
-            <Button x:Name="joinRoom" Click="JoinRoom_Click" IsEnabled="False" Margin="0 20 0 0">Join Room</Button>
+            <Button x:Name="joinRoom"
+                    Click="JoinRoom_Click"
+                    IsEnabled="False"
+                    Margin="0 20 0 0">Join Room</Button>
+            <CheckBox
+                x:Name="pauseAndOpenChatOnMessageReceived"
+                Margin="0 20 0 0"
+                Click="PauseAndOpenChatOnMessageReceived_Click">Pause video &amp; open chat on receiving a new message</CheckBox>
+            <CheckBox
+                x:Name="dontPlayOnMediaLoad"
+                Margin="0 20 0 0"
+                Click="DontPlayOnMediaLoad_Click">Don't play video automatically when you open it</CheckBox>
         </StackPanel>
     </Grid>
 </Window>

@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace Synced_Player
@@ -15,6 +16,8 @@ namespace Synced_Player
             serverAddress.Text = Properties.Settings.Default.ServerAddress;
             roomName.Text = Properties.Settings.Default.RoomName;
             username.Text = Properties.Settings.Default.Username;
+            pauseAndOpenChatOnMessageReceived.IsChecked = Properties.Settings.Default.PauseAndOpenChatOnMessageReceived;
+            dontPlayOnMediaLoad.IsChecked = Properties.Settings.Default.DontPlayOnMediaLoad;
 
             // since we don't want the TextChanged events while running the above statements, event handlers are placed here:
             serverAddress.TextChanged += ServerAddress_TextChanged;
@@ -79,6 +82,32 @@ namespace Synced_Player
             {
                 Close();
             }
+        }
+
+        private void PauseAndOpenChatOnMessageReceived_Click(object sender, RoutedEventArgs e)
+        {
+            if (pauseAndOpenChatOnMessageReceived.IsChecked == true)
+            {
+                Properties.Settings.Default.PauseAndOpenChatOnMessageReceived = true;
+            }
+            else
+            {
+                Properties.Settings.Default.PauseAndOpenChatOnMessageReceived = false;
+            }
+            Properties.Settings.Default.Save();
+        }
+
+        private void DontPlayOnMediaLoad_Click(object sender, RoutedEventArgs e)
+        {
+            if (dontPlayOnMediaLoad.IsChecked == true)
+            {
+                Properties.Settings.Default.DontPlayOnMediaLoad = true;
+            }
+            else
+            {
+                Properties.Settings.Default.DontPlayOnMediaLoad = false;
+            }
+            Properties.Settings.Default.Save();
         }
     }
 }

@@ -114,6 +114,7 @@
     <Compile Include="ChatModal.xaml.cs">
       <DependentUpon>ChatModal.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ConnectionStatus.cs" />
     <Compile Include="PreferencesWindow.xaml.cs">
       <DependentUpon>PreferencesWindow.xaml</DependentUpon>
     </Compile>

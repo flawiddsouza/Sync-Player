@@ -148,5 +148,33 @@ namespace Synced_Player.Properties {
                 this["Volume"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Configuration.SettingsProviderAttribute(typeof(crdx.Settings.PortableSettingsProvider))]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.SettingsManageabilityAttribute(global::System.Configuration.SettingsManageability.Roaming)]
+        public bool PauseAndOpenChatOnMessageReceived {
+            get {
+                return ((bool)(this["PauseAndOpenChatOnMessageReceived"]));
+            }
+            set {
+                this["PauseAndOpenChatOnMessageReceived"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Configuration.SettingsProviderAttribute(typeof(crdx.Settings.PortableSettingsProvider))]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.SettingsManageabilityAttribute(global::System.Configuration.SettingsManageability.Roaming)]
+        public bool DontPlayOnMediaLoad {
+            get {
+                return ((bool)(this["DontPlayOnMediaLoad"]));
+            }
+            set {
+                this["DontPlayOnMediaLoad"] = value;
+            }
+        }
     }
 }

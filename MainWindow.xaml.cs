@@ -2,14 +2,13 @@
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Media;
 using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Shell;
+using System.Windows.Media;
 
 namespace Synced_Player
 {
@@ -28,6 +27,7 @@ namespace Synced_Player
         public DelegateCommand OpenPreferencesCommand { get; set; }
         public DelegateCommand OpenChatCommand { get; set; }
         public ObservableCollection<String> Messages { get; set; }
+        public bool ChatOpen = false;
 
         private Timer hideTimer;
         private bool vlcPlayerPausedOrStopped = false;
@@ -105,6 +105,22 @@ namespace Synced_Player
             }
         }
 
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.I)
+            {
+                infoPanel.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.I)
+            {
+                infoPanel.Visibility = Visibility.Hidden;
+            }
+        }
+
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
             syncClient?.Close();
@@ -116,6 +132,29 @@ namespace Synced_Player
         }
 
         // SyncClient Event Handlers
+
+        private void SyncClient_ConnectionChanged(object sender, ConnectionEventArgs e)
+        {
+            switch (e.Status)
+            {
+                case ConnectionStatus.Connected:
+                    Dispatcher.Invoke(() =>
+                    {
+                        ShowNotification("Connected");
+                        connectionStatus.Text = "Connected";
+                    });
+                    connectionStatus.Foreground = (SolidColorBrush)new BrushConverter().ConvertFromString("#98ff59");
+                    break;
+                case ConnectionStatus.Disconnected:
+                    Dispatcher.Invoke(() =>
+                    {
+                        connectionStatus.Text = "Disconnected";
+                        connectionStatus.Foreground = (SolidColorBrush)new BrushConverter().ConvertFromString("#ff5e59");
+                    });
+                    ShowNotification("Disconnected");
+                    break;
+            }
+        }
 
         private void SyncClient_SeekToReceived(object sender, SyncEventArgs e)
         {
@@ -150,6 +189,17 @@ namespace Synced_Player
             {
                 Messages.Add(e.User + " [" + StringifyElapsedTime(seekTime) + "]: " + e.ChatMessage);
                 messageAlert.Play();
+                if (Properties.Settings.Default.PauseAndOpenChatOnMessageReceived)
+                {
+                    if (!vlcPlayerPausedOrStopped)
+                    {
+                        Pause();
+                    }
+                    if (!ChatOpen)
+                    {
+                        OpenChat();
+                    }
+                }
             });
         }
 
@@ -296,10 +346,7 @@ namespace Synced_Player
 
         private void ExecuteOpenChatCommand(object parameter)
         {
-            ChatModal chatModal = new ChatModal();
-            chatModal.Owner = this;
-            chatModal.DataContext = this;
-            chatModal.Show();
+            OpenChat();
         }
 
         // Plain Methods
@@ -308,13 +355,14 @@ namespace Synced_Player
         {
             if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.ServerAddress) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.RoomName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.Username) && syncClient == null)
             {
-                syncClient = SyncClient.CreateInstance(Properties.Settings.Default.ServerAddress, Properties.Settings.Default.RoomName, Properties.Settings.Default.Username);
-                if (syncClient != null)
+                syncClient = new SyncClient(Properties.Settings.Default.ServerAddress, Properties.Settings.Default.RoomName, Properties.Settings.Default.Username);
+                syncClient.ConnectionChanged += SyncClient_ConnectionChanged;
+                syncClient.SeekToReceived += SyncClient_SeekToReceived;
+                syncClient.PauseReceived += SyncClient_PauseReceived;
+                syncClient.PlayReceived += SyncClient_PlayReceived;
+                syncClient.ChatReceived += SyncClient_ChatReceived;
+                if (syncClient.Connect() == true)
                 {
-                    syncClient.SeekToReceived += SyncClient_SeekToReceived;
-                    syncClient.PauseReceived += SyncClient_PauseReceived;
-                    syncClient.PlayReceived += SyncClient_PlayReceived;
-                    syncClient.ChatReceived += SyncClient_ChatReceived;
                     return true;
                 }
                 else
@@ -330,12 +378,27 @@ namespace Synced_Player
 
         public void LeaveRoom()
         {
-            syncClient?.Close();
+            syncClient.Close();
+            syncClient.ConnectionChanged -= SyncClient_ConnectionChanged;
+            syncClient.SeekToReceived -= SyncClient_SeekToReceived;
+            syncClient.PauseReceived -= SyncClient_PauseReceived;
+            syncClient.PlayReceived -= SyncClient_PlayReceived;
+            syncClient.ChatReceived -= SyncClient_ChatReceived;
+            syncClient = null;
         }
 
         public void SendChat(String message)
         {
             syncClient?.SendChatMessage(vlcPlayer.Position.ToString(), message);
+        }
+
+        private void OpenChat()
+        {
+            ChatModal chatModal = new ChatModal();
+            chatModal.Owner = this;
+            chatModal.DataContext = this;
+            chatModal.Show();
+            ChatOpen = true;
         }
 
         private void CenterAllOwnedWindowsToSelf()
@@ -443,7 +506,17 @@ namespace Synced_Player
                 vlcPlayer.LoadMedia(openFileDialog.FileName);
                 Title = Path.GetFileName(openFileDialog.FileName) + " - " + Title;
                 seekBar.IsEnabled = true;
-                Play();
+                if (Properties.Settings.Default.DontPlayOnMediaLoad == false)
+                {
+                    Play();
+                }
+                else
+                {
+                    // the thing is, we can't access the duration of the clip without playing it even once
+                    // since DontPlayOnMediaLoad flag is true, the below method will just set both player times to 00:00
+                    // until the video is played - don't blame me, it's LibVLC's fault
+                    UpdatePlayerTimes(); // if we don't run this the player times will stay as --:--
+                }
             }
         }
 
