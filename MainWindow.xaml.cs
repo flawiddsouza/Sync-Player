@@ -512,9 +512,10 @@ namespace Synced_Player
                 }
                 else
                 {
-                    // the thing is, we can't access the duration of the clip without playing it even once
-                    // since DontPlayOnMediaLoad flag is true, the below method will just set both player times to 00:00
-                    // until the video is played - don't blame me, it's LibVLC's fault
+                    vlcPlayer.Play();
+                    System.Threading.Thread.Sleep(1000); // if we don't do this, the player will keep playing the video ignoring the next command
+                    vlcPlayer.Pause();
+                    vlcPlayerPausedOrStopped = true;
                     UpdatePlayerTimes(); // if we don't run this the player times will stay as --:--
                 }
             }
